@@ -1,25 +1,32 @@
 import os
+import requests
 import streamlit as st
-import google.generativeai as genai
 from pypdf import PdfReader
 import docx
 
-# ضبط إعدادات الصفحة
 st.set_page_config(page_title="المساعد الإداري الذكي", layout="wide")
 
-# استدعاء مفتاح API
+# جلب المفتاح
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
     st.stop()
 
-# تهيئة Gemini
-try:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
-except Exception as e:
-    st.error(f"خطأ في تهيئة النموذج: {e}")
-    st.stop()
+def ask_gemini(prompt_text):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt_text}]
+        }]
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    res_json = response.json()
+    
+    if response.status_code == 200:
+        return res_json["candidates"][0]["content"]["parts"][0]["text"]
+    else:
+        raise Exception(res_json.get("error", {}).get("message", response.text))
 
 def extract_text_from_pdf(file):
     reader = PdfReader(file)
@@ -55,9 +62,9 @@ with tab1:
 المهمة: {doc_query}
 قدّم تقريراً هيكلياً يتضمن ملخصاً تنفيذياً، الثغرات أو النواقص إن وجدت، والتوصيات التنفيذية."""
                     
-                    response = model.generate_content(prompt)
+                    result_text = ask_gemini(prompt)
                     st.markdown("### 📋 التقرير التحليلي:")
-                    st.markdown(response.text)
+                    st.markdown(result_text)
                 except Exception as err:
                     st.error(f"حدث خطأ أثناء معالجة الطلب: {err}")
         else:
@@ -80,9 +87,9 @@ with tab2:
 2. مصفوفة تحديد المسؤوليات والموارد المطلوبة.
 3. جدول مؤشرات قياس أداء واضحة وقابلة للقياس (KPIs SMART) مع القيم المستهدفة."""
                     
-                    response = model.generate_content(prompt)
+                    result_text = ask_gemini(prompt)
                     st.markdown("### 🗓️ الخطة التنفيذية المقترحة:")
-                    st.markdown(response.text)
+                    st.markdown(result_text)
                 except Exception as err:
                     st.error(f"حدث خطأ أثناء معالجة الطلب: {err}")
         else:
@@ -107,9 +114,9 @@ with tab3:
 2. تحديد نسبة الإنجاز التقريبية وتحديد مواطن الخلل أو التأخير.
 3. خطة إجراءات تصحيحية فورية وملموسة لمعالجة الفجوات."""
                     
-                    response = model.generate_content(prompt)
+                    result_text = ask_gemini(prompt)
                     st.markdown("### 📊 تقرير المتابعة والتقييم:")
-                    st.markdown(response.text)
+                    st.markdown(result_text)
                 except Exception as err:
                     st.error(f"حدث خطأ أثناء معالجة الطلب: {err}")
         else:
