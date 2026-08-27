@@ -4,14 +4,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from google import genai
-from google.genai import types
 from PIL import Image
 from pypdf import PdfReader
 import docx
 
-st.set_page_config(page_title="المساعد الإداري الذكي المتكامل", layout="wide", page_icon="💼")
+st.set_page_config(page_title="المساعد الإداري والإعلامي الذكي", layout="wide", page_icon="💼")
 
-# إعداد مفتاح API
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
@@ -20,7 +18,6 @@ if not api_key:
 client = genai.Client(api_key=api_key.strip())
 MODEL_NAME = "gemini-3.6-flash"
 
-# تهيئة سجل المحفوظات
 if "history" not in st.session_state:
     st.session_state.history = []
 
@@ -33,7 +30,7 @@ def extract_text_from_file(file):
         return "\n".join([p.text for p in doc.paragraphs])
     return ""
 
-def create_docx_download(content_text, title="التقرير الإداري"):
+def create_docx_download(content_text, title="المستند الإداري"):
     doc = docx.Document()
     doc.add_heading(title, level=0)
     for paragraph in content_text.split("\n"):
@@ -43,11 +40,10 @@ def create_docx_download(content_text, title="التقرير الإداري"):
     doc.save(bio)
     return bio.getvalue()
 
-# القائمة الجانبية
 with st.sidebar:
-    st.header("⚙️ تخصيص الوكيل الإداري")
+    st.header("⚙️ خيارات التخصيص العام")
     persona = st.selectbox(
-        "أسلوب ونبرة الصياغة:",
+        "أسلوب ونبرة الصياغة الإدارية:",
         [
             "تدقيق رقابي وقانوني صارم",
             "صياغة إدارية واستراتيجية متوازنة",
@@ -56,25 +52,96 @@ with st.sidebar:
         ]
     )
     st.markdown("---")
-    st.subheader("🗂️ سجل العمليات السابقة")
+    st.subheader("🗂️ سجل العمليات")
     if st.session_state.history:
         for idx, item in enumerate(reversed(st.session_state.history)):
             with st.expander(f"{item['type']} - {item['time']}"):
                 st.write(item["preview"][:150] + "...")
     else:
-        st.caption("لا توجد تقارير محفوظة بعد.")
+        st.caption("لا توجد مخرجات محفوظة بعد.")
 
-st.title("💼 المنظومة الإدارية والذكاء المؤسسي الشامل")
+st.title("💼 المنظومة الإدارية والإعلامية الشاملة")
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📰 وكيل التحرير والإعلام",
     "📄 فحص ومقارنة الوثائق",
-    "📊 التخطيط الاستراتيجي ومؤشرات الأداء",
-    "📈 المتابعة الميدانية وتحليل الفجوات",
-    "📊 لوحة مؤشرات الأداء (Dashboard)"
+    "📊 التخطيط ومؤشرات KPIs",
+    "📈 المتابعة وتحليل الفجوات",
+    "📊 لوحة المؤشرات البيانية"
 ])
 
-# --- التبويب 1: فحص ومقارنة الوثائق ---
+# --- التبويب 1: وكيل التحرير والإعلام الصحفي ---
 with tab1:
+    st.header("صياغة الأخبار والبيانات الصحفية باحترافية")
+    
+    col_type, col_tone = st.columns(2)
+    with col_type:
+        news_type = st.selectbox(
+            "نوع القالب الإعلامي:",
+            [
+                "خبر صحفي قياسي (أسلوب الهرم المقلوب)",
+                "منشور تفاعلي لمنصات التواصل الاجتماعي (Facebook & X)",
+                "بيان صحفي وتصريح رسمي رسمي",
+                "تقرير إخباري موسّع مع عناصر جذب",
+                "تغطية مؤتمر / فعالية / نشاط ميداني"
+            ]
+        )
+    with col_tone:
+        news_tone = st.selectbox(
+            "نبرة الخطاب الإعلامي:",
+            [
+                "احترافي رصين وجذاب",
+                "حماسي وملهم للجمهور العام",
+                "رسمي ومؤسسي دقيق",
+                "تفاعلي ومختصر للسوشيال ميديا"
+            ]
+        )
+
+    raw_event = st.text_area(
+        "بيانات الفعالية أو تفاصيل الحدث (النقاط الأساسية):",
+        placeholder="أدخل المعلومات الأساسية (ماذا حدث، من، أين، متى، الأرقام البارزة، التصريحات)...",
+        height=140
+    )
+    
+    col_quote, col_target = st.columns(2)
+    with col_quote:
+        official_quote = st.text_input("تصريح رسمي أو اقتباس خاص (اختياري):", placeholder="مثال: صرح رئيس اللجنة بأن...")
+    with col_target:
+        target_audience = st.text_input("الجمهور المستهدف (اختياري):", placeholder="مثال: المجتمع المحلي، الكوادر الإدارية، الإعلاميين...")
+
+    if st.button("صياغة المادة الإعلامية", type="primary"):
+        if raw_event.strip():
+            with st.spinner("جاري صياغة الخبر باحترافية صحفية..."):
+                try:
+                    prompt = f"""أنت رئيس تحرير وصحفي محترف وخبير في الإعلام المؤسسي وصناعة المحتوى الجذاب.
+النوع المطلوب: {news_type}
+النبرة الإعلامية: {news_tone}
+الجمهور المستهدف: {target_audience if target_audience else 'الجمهور العام'}
+التفاصيل والوقائع:
+{raw_event}
+
+اقتباس مرفق: {official_quote if official_quote else 'لا يوجد'}
+
+المطلوب صياغته بدقة:
+1. 3 مقترحات لعناوين صحفية ذكية وجذابة (Catchy Headlines) بعيداً عن الركاكة والابتذال.
+2. متن الخبر وفق أفضل المعايير التحريرية (المقدمة 'Lead' تجيب عن الأسئلة الجوهرية، المتن بتسلسل منطقي للأهمية، الخاتمة).
+3. نسخة مهيأة للسوشيال ميديا مع نصائح نشر والوسوم (Hashtags) الأنسب.
+4. مقترح لصورة أو زاوية تصوير فوتوغرافي مرافقة للخبر."""
+                    
+                    res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                    st.markdown("### 📰 المادة الصحفية الجاهزة:")
+                    st.markdown(res.text)
+                    
+                    st.session_state.history.append({"type": "خبر صحفي", "time": pd.Timestamp.now().strftime("%H:%M:%S"), "preview": res.text})
+                    docx_file = create_docx_download(res.text, "المادة الصحفية والإعلامية")
+                    st.download_button("📥 تحميل المادة الصحفية (Word)", docx_file, file_name="Press_Release.docx")
+                except Exception as err:
+                    st.error(f"حدث خطأ: {err}")
+        else:
+            st.warning("يرجى إدخال تفاصيل الحدث أو الخبر أولاً.")
+
+# --- التبويب 2: فحص ومقارنة الوثائق ---
+with tab2:
     st.header("فحص الوثائق والصور أو مقارنة مسودتين")
     doc_mode = st.radio("نوع العملية:", ["تحليل وتدقيق وثيقة واحدة (أو صورة)", "مقارنة وثيقتين لكشف الفروق والتعارضات"], horizontal=True)
     
@@ -86,7 +153,6 @@ with tab1:
             if uploaded_file and query:
                 with st.spinner("جاري المعالجة والتحليل..."):
                     try:
-                        contents = []
                         if uploaded_file.type.startswith("image/"):
                             img = Image.open(uploaded_file)
                             contents = [img, f"النبرة المطلوبة: {persona}\nالمهمة: {query}\nحلل محتوى هذه الصورة بدقة إدارية."]
@@ -99,9 +165,8 @@ with tab1:
                         st.markdown(res.text)
                         
                         st.session_state.history.append({"type": "تحليل وثيقة", "time": pd.Timestamp.now().strftime("%H:%M:%S"), "preview": res.text})
-                        
                         docx_file = create_docx_download(res.text, "تقرير تحليل وثيقة")
-                        st.download_button("📥 تحميل التقرير بصيغة Word", docx_file, file_name="Document_Analysis.docx")
+                        st.download_button("📥 تحميل التقرير (Word)", docx_file, file_name="Document_Analysis.docx")
                     except Exception as err:
                         st.error(f"حدث خطأ: {err}")
             else:
@@ -120,17 +185,14 @@ with tab1:
                         text_a = extract_text_from_file(file_a)
                         text_b = extract_text_from_file(file_b)
                         prompt = f"""النبرة: {persona}
-أنت خبير تدقيق وثائق. قارن بين الوثيقتين التاليتين:
+أنت خبير تدقيق وثائق. قارن بين الوثيقتين:
 [الوثيقة 1]:
 {text_a[:6000]}
 
 [الوثيقة 2]:
 {text_b[:6000]}
 
-المطلوب:
-1. جدول مقارنة دقيق بالتغييرات والإضافات والمحذوفات.
-2. الثغرات القانونية أو الإدارية الناشئة عن التعديلات.
-3. التوصيات النهائية."""
+المطلوب: جدول مقارنة دقيق بالتغييرات والإضافات والمحذوفات، الثغرات القانونية أو الإدارية الناشئة عن التعديلات، والتوصيات النهائية."""
                         res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
                         st.markdown("### 🔍 تقرير المقارنة:")
                         st.markdown(res.text)
@@ -140,8 +202,8 @@ with tab1:
                     except Exception as err:
                         st.error(f"حدث خطأ: {err}")
 
-# --- التبويب 2: التخطيط الاستراتيجي ---
-with tab2:
+# --- التبويب 3: التخطيط الاستراتيجي ---
+with tab3:
     st.header("بناء الخطط التنفيذية ومصفوفة KPIs")
     goals = st.text_area("أدخل الأهداف والبيانات الأولية للمشروع:", height=130)
     col1, col2 = st.columns(2)
@@ -172,8 +234,8 @@ with tab2:
                 except Exception as err:
                     st.error(f"حدث خطأ: {err}")
 
-# --- التبويب 3: المتابعة والتقييم ---
-with tab3:
+# --- التبويب 4: المتابعة والتقييم ---
+with tab4:
     st.header("مقارنة المخطط بالمنجز وحساب الفجوات")
     planned = st.text_area("المستهدفات والمخطط له مسبقاً:", height=100)
     actual = st.text_area("المنجز الفعلي على أرض الواقع:", height=100)
@@ -198,8 +260,8 @@ with tab3:
                 except Exception as err:
                     st.error(f"حدث خطأ: {err}")
 
-# --- التبويب 4: لوحة مؤشرات الأداء البصرية ---
-with tab4:
+# --- التبويب 5: لوحة مؤشرات الأداء البصرية ---
+with tab5:
     st.header("📊 لوحة قياس الأداء البيانية التفاعلية")
     st.write("أدخل نسب الإنجاز للمشاريع/المسارات لمشاهدة التحليل البصري المباشر:")
     
@@ -212,7 +274,6 @@ with tab4:
     
     if not df.empty:
         df["الفجوة (%)"] = df["المستهدف (%)"] - df["المتحقق الفعلي (%)"]
-        
         fig = px.bar(
             df, 
             x="المسار / المشروع", 
