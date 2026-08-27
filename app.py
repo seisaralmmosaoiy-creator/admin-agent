@@ -1,38 +1,19 @@
 import os
-import requests
 import streamlit as st
+from google import genai
 from pypdf import PdfReader
 import docx
 
 st.set_page_config(page_title="المساعد الإداري الذكي", layout="wide")
 
+# جلب المفتاح
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
     st.stop()
 
-def ask_gemini(prompt_text):
-    clean_key = api_key.strip()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={clean_key}"
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": clean_key,
-        "Authorization": f"Bearer {clean_key}"
-    }
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt_text}]
-        }]
-    }
-    
-    response = requests.post(url, json=payload, headers=headers)
-    res_json = response.json()
-    
-    if response.status_code == 200:
-        return res_json["candidates"][0]["content"]["parts"][0]["text"]
-    else:
-        err_msg = res_json.get("error", {}).get("message", response.text)
-        raise Exception(err_msg)
+# تهيئة العميل الجديد
+client = genai.Client(api_key=api_key.strip())
 
 def extract_text_from_pdf(file):
     reader = PdfReader(file)
@@ -68,9 +49,12 @@ with tab1:
 المهمة: {doc_query}
 قدّم تقريراً هيكلياً يتضمن ملخصاً تنفيذياً، الثغرات أو النواقص إن وجدت، والتوصيات التنفيذية."""
                     
-                    result_text = ask_gemini(prompt)
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt
+                    )
                     st.markdown("### 📋 التقرير التحليلي:")
-                    st.markdown(result_text)
+                    st.markdown(response.text)
                 except Exception as err:
                     st.error(f"حدث خطأ أثناء معالجة الطلب: {err}")
         else:
@@ -93,9 +77,12 @@ with tab2:
 2. مصفوفة تحديد المسؤوليات والموارد المطلوبة.
 3. جدول مؤشرات قياس أداء واضحة وقابلة للقياس (KPIs SMART) مع القيم المستهدفة."""
                     
-                    result_text = ask_gemini(prompt)
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt
+                    )
                     st.markdown("### 🗓️ الخطة التنفيذية المقترحة:")
-                    st.markdown(result_text)
+                    st.markdown(response.text)
                 except Exception as err:
                     st.error(f"حدث خطأ أثناء معالجة الطلب: {err}")
         else:
@@ -120,9 +107,12 @@ with tab3:
 2. تحديد نسبة الإنجاز التقريبية وتحديد مواطن الخلل أو التأخير.
 3. خطة إجراءات تصحيحية فورية وملموسة لمعالجة الفجوات."""
                     
-                    result_text = ask_gemini(prompt)
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt
+                    )
                     st.markdown("### 📊 تقرير المتابعة والتقييم:")
-                    st.markdown(result_text)
+                    st.markdown(response.text)
                 except Exception as err:
                     st.error(f"حدث خطأ أثناء معالجة الطلب: {err}")
         else:
