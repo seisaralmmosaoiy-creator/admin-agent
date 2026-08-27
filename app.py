@@ -6,14 +6,14 @@ import docx
 
 st.set_page_config(page_title="المساعد الإداري الذكي", layout="wide")
 
-# جلب المفتاح
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
     st.stop()
 
-# تهيئة العميل الجديد
+# تهيئة العميل
 client = genai.Client(api_key=api_key.strip())
+MODEL_NAME = "gemini-3.6-flash"
 
 def extract_text_from_pdf(file):
     reader = PdfReader(file)
@@ -50,7 +50,7 @@ with tab1:
 قدّم تقريراً هيكلياً يتضمن ملخصاً تنفيذياً، الثغرات أو النواقص إن وجدت، والتوصيات التنفيذية."""
                     
                     response = client.models.generate_content(
-                        model="gemini-2.5-flash",
+                        model=MODEL_NAME,
                         contents=prompt
                     )
                     st.markdown("### 📋 التقرير التحليلي:")
@@ -78,7 +78,7 @@ with tab2:
 3. جدول مؤشرات قياس أداء واضحة وقابلة للقياس (KPIs SMART) مع القيم المستهدفة."""
                     
                     response = client.models.generate_content(
-                        model="gemini-2.5-flash",
+                        model=MODEL_NAME,
                         contents=prompt
                     )
                     st.markdown("### 🗓️ الخطة التنفيذية المقترحة:")
@@ -108,7 +108,7 @@ with tab3:
 3. خطة إجراءات تصحيحية فورية وملموسة لمعالجة الفجوات."""
                     
                     response = client.models.generate_content(
-                        model="gemini-2.5-flash",
+                        model=MODEL_NAME,
                         contents=prompt
                     )
                     st.markdown("### 📊 تقرير المتابعة والتقييم:")
