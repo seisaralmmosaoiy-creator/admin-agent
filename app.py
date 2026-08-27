@@ -5,13 +5,15 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from google import genai
+from google.genai import types
 from PIL import Image
 from pypdf import PdfReader
 import docx
+from gtts import gTTS
 
-st.set_page_config(page_title="المساعد التنفيذي والعلمي الشامل", layout="wide", page_icon="🏛️")
+st.set_page_config(page_title="المنظومة الاستشارية والتنفيذية الشاملة", layout="wide", page_icon="🏛️")
 
-# إعداد المفتاح
+# تهيئة المفتاح والعميل
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
@@ -20,7 +22,6 @@ if not api_key:
 client = genai.Client(api_key=api_key.strip())
 MODEL_NAME = "gemini-3.6-flash"
 
-# دالة ذكية لإعادة المحاولة عند الضغط المؤقت على السيرفر (503)
 def generate_with_retry(contents, max_retries=3):
     for attempt in range(max_retries):
         try:
@@ -32,8 +33,19 @@ def generate_with_retry(contents, max_retries=3):
                     continue
             raise e
 
-if "history" not in st.session_state:
-    st.session_state.history = []
+def text_to_audio_bytes(text_arabic):
+    try:
+        clean_text = text_arabic.replace("*", "").replace("#", "")[:500]
+        tts = gTTS(text=clean_text, lang='ar', slow=False)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return fp.getvalue()
+    except Exception:
+        return None
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
 def extract_text_from_file(file):
     if file.name.endswith(".pdf"):
@@ -56,337 +68,284 @@ def create_docx_download(content_text, title="المستند"):
 
 # الشريط الجانبي
 with st.sidebar:
-    st.header("⚙️ تخصيص الأسلوب العام")
-    persona = st.selectbox(
-        "نبرة الصياغة الافتراضية:",
+    st.header("👤 السكرتير والمستشار الخاص")
+    secretary_mode = st.selectbox(
+        "شخصية وطبيعة الحوار:",
         [
-            "سكرتارية تنفيذية رفيعة المستوى ورسمية",
-            "تدقيق رقابي وقانوني صارم",
-            "صياغة إدارية واستراتيجية متوازنة",
-            "صياغة إعلامية وبيانات صحفية",
-            "بحث حوزوي واستدلالي رصين"
+            "مساعد وسكرتير شخصي شامل (لكل شؤون الحياة والعمل)",
+            "مستشار فكري وحكيم ناصح",
+            "قائد ومدير أعمال استراتيجي",
+            "محقق وباحث علمي دقيق",
+            "خبير ديكور وتصميم داخلي",
+            "مستشار زراعي واجتماعي"
         ]
     )
+    voice_output = st.checkbox("🔊 تشغيل الرد الصوتي تلقائياً", value=True)
     st.markdown("---")
-    st.subheader("🗂️ سجل المخرجات الأخيرة")
-    if st.session_state.history:
-        for idx, item in enumerate(reversed(st.session_state.history)):
-            with st.expander(f"{item['type']} - {item['time']}"):
-                st.write(item["preview"][:150] + "...")
-    else:
-        st.caption("لا توجد مخرجات محفوظة بعد.")
+    st.caption("يعمل كعقلك المساعد لإدارة كافة المهام الفكرية، الإدارية، الحياتية، والتصميمية.")
 
-st.title("🏛️ المنظومة الإدارية والعلمية والمساعد التنفيذي الخاص")
+st.title("🏛️ المنظومة الاستشارية والتنفيذية الشاملة")
 
-# التبويبات الشاملة
 tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "👤 السكرتير التنفيذي الخاص",
-    "📚 البحوث الحوزوية والمقالات",
+    "🎙️ السكرتير الشخصي الصوتي",
+    "📚 البحوث الحوزوية والعلمية",
     "📰 التحرير والإعلام الصحفي",
     "📄 فحص ومقارنة الوثائق",
-    "📊 التخطيط ومؤشرات KPIs",
-    "📈 المتابعة وتحليل الفجوات",
+    "🧭 القيادة والتخطيط والتقويم",
+    "🌿 الاستشارات الحياتية والديكور",
     "📊 لوحة المؤشرات البيانية"
 ])
 
-# --- التبويب 0: السكرتير التنفيذي الخاص ---
+# --- التبويب 0: السكرتير الشخصي المباشر ---
 with tab0:
-    st.header("👤 مهام السكرتارية التنفيذية وإدارة الأعمال")
+    st.header("المحادثة والاستشارة الشخصية (صوت وكتابة)")
+    audio_record = st.audio_input("🎙️ تحدث بصوتك مباشرة:")
+    text_input_val = st.text_area("أو اكتب هنا تفاصيل ما تريده (شخصي، عام، أفكار، تنظيم وقت):", height=110)
     
-    sec_task = st.selectbox(
-        "نوع المهمة الإدارية / السكرتارية:",
-        [
-            "صياغة كتاب رسمي / مخاطبة إدارية رفيعة المستوى",
-            "تحرير محضر اجتماع رسمي (Minutes of Meeting) وتحديد التكليفات",
-            "تنظيم جدول الأعمال وترتيب الأولويات اليومية / الأسبوعية",
-            "صياغة رسالة بريد إلكتروني (Email) رسمية أو عاجلة",
-            "تلخيص رسائل / تقارير مطولة وتقديم بطاقة إحاطة تنفيذية موجزة (Brief)"
-        ]
-    )
-    
-    col_from, col_to = st.columns(2)
-    with col_from:
-        sender_info = st.text_input("الجهة / الصفة الصادرة (اختياري):", placeholder="مثال: مكتب الإدارة العامة / رئيس القسم...")
-    with col_to:
-        receiver_info = st.text_input("الجهة / الصفة الموجه إليها (اختياري):", placeholder="مثال: معالي الوزير / مجلس الإدارة / موظفي القسم...")
-
-    sec_input = st.text_area(
-        "البيانات، النقاط الأساسية، أو مسودة الموضوع:",
-        placeholder="اكتب هنا تفاصيل الموضوع أو مسودة الاجتماع أو قائمة المهام المراد تنظيمها...",
-        height=140
-    )
-    
-    if st.button("تنفيذ المهمة عبر السكرتير التنفيذي", type="primary"):
-        if sec_input.strip():
-            with st.spinner("جاري الإعداد والصياغة التنفيذية المتقنة..."):
+    if st.button("إرسال للسكرتير", type="primary"):
+        contents_list = []
+        user_display = ""
+        if audio_record is not None:
+            audio_raw = audio_record.read()
+            contents_list = [
+                types.Part.from_bytes(data=audio_raw, mime_type="audio/wav"),
+                f"أنت سكرتيري ومساعدي الشخصي الخاص في كل شؤون حياتي. أسلوبك: {secretary_mode}. استمع لما قلته وأجبني بحكمة ولباقة وحلول وافية."
+            ]
+            user_display = "🎤 [رسالة صوتية مسجلة]"
+        elif text_input_val.strip():
+            user_display = text_input_val
+            contents_list = [
+                f"""أنت سكرتيري ومساعدي الشخصي الشامل في كل شؤون حياتي وأفكاري وأعمالي.
+الأسلوب: {secretary_mode}
+الرسالة: {text_input_val}
+أجبني بدقة، رتب الأولويات، وقدم المخرجات المطلوبة بأعلى جودة."""
+            ]
+        
+        if contents_list:
+            with st.spinner("السكرتير يجيب..."):
                 try:
-                    prompt = f"""أنت سكرتير تنفيذي ومساعد خاص رفيع المستوى (Executive Assistant)، تتميز بالدقة العالية، الفطنة الإدارية، الصياغة المحكمة الخالية من الحشو، واستخدام أرفع أساليب الدبلوماسية الإدارية.
-المهمة الموكلة إليك: {sec_task}
-الصفة الصادرة: {sender_info if sender_info else 'الإدارة المعنية'}
-الجهة الموجه إليها: {receiver_info if receiver_info else 'الجهة ذات العلاقة'}
-المدخلات والملاحظات الأولية:
-{sec_input}
-
-المطلوب:
-- إخراج المستند بتنسيق مؤسسي كامل وجاهز للاعتماد أو التوقيع فوراً.
-- استخدام الترويسة، الديباجة، المتن المهيكل، وخاتمة مناسبة بدقة.
-- استخراج جدول مهام أو خطوات إجرائية تالية (Action Items) إن كانت المهمة محضر اجتماع أو تنظيم أعمال."""
-                    
-                    res = generate_with_retry(prompt)
-                    st.markdown("### 📑 المستند الصادر من السكرتير التنفيذي:")
-                    st.markdown(res.text)
-                    
-                    st.session_state.history.append({"type": "مهمة سكرتارية", "time": pd.Timestamp.now().strftime("%H:%M:%S"), "preview": res.text})
-                    docx_file = create_docx_download(res.text, f"مستند سكرتارية - {sec_task}")
-                    st.download_button("📥 تحميل المستند بصيغة Word", docx_file, file_name="Executive_Document.docx")
+                    res = generate_with_retry(contents_list)
+                    reply = res.text
+                    st.session_state.chat_history.append({"user": user_display, "bot": reply})
+                    st.markdown("### 💬 رد السكرتير:")
+                    st.markdown(reply)
+                    if voice_output:
+                        audio_res = text_to_audio_bytes(reply)
+                        if audio_res:
+                            st.audio(audio_res, format="audio/mp3")
+                    docx_out = create_docx_download(reply, "مخرجات السكرتير الشخصي")
+                    st.download_button("📥 تحميل الرد (Word)", docx_out, file_name="Secretary_Note.docx")
                 except Exception as err:
-                    st.error(f"حدث خطأ أثناء المعالجة: {err}")
+                    st.error(f"حدث خطأ: {err}")
         else:
-            st.warning("يرجى إدخال البيانات أو تفاصيل المهمة.")
+            st.warning("يرجى إدخال رسالة صوتية أو نص.")
 
-# --- التبويب 1: البحوث الحوزوية والمقالات ---
+    if st.session_state.chat_history:
+        st.markdown("---")
+        st.subheader("📜 أرشيف المحادثة:")
+        for ch in reversed(st.session_state.chat_history[-4:]):
+            st.chat_message("user").write(ch["user"])
+            st.chat_message("assistant").write(ch["bot"])
+
+# --- التبويب 1: البحوث الحوزوية والعلمية ---
 with tab1:
-    st.header("كتابة وتحقيق الأبحاث الحوزوية والمقالات الفكرية")
-    col_field, col_style = st.columns(2)
-    with col_field:
-        research_type = st.selectbox(
-            "المجال العلمي / التخصص:",
-            [
-                "بحث فقهي / أصولي استدلالي",
-                "بحث كلامي / عقائدي مقارن",
-                "دراسة قرآنية وحديثية (تفسير، دراية، رجال)",
-                "بحث تاريخي وتحقيقي تراثي",
-                "مقال فكري وفلسفي معاصر",
-                "دراسة أخلاقية وتربوية تخصصية"
-            ]
-        )
-    with col_style:
-        methodology = st.selectbox(
-            "المنهج والأسلوب التحريري:",
-            [
-                "استدلالي حوزوي رصين (تحرير محل النزاع، الأقوال، الأدلة، المناقشة، المختار)",
-                "تحقيقي أكاديمي موثق بالمصادر والمراجع التراثية",
-                "مقال تحليلي فكري يخاطب النخب المعاصرة",
-                "صياغة منبرية وتوجيهية محكمة"
-            ]
-        )
-
-    topic = st.text_input("عنوان البحث أو القضية المراد معالجتها:", placeholder="مثال: ملكية الميت / قاعدة نفي السبيل وتطبيقاتها المعاصرة...")
-    raw_points = st.text_area(
-        "المحاور، الأدلة المقترحة، أو النصوص المراد تضمينها (اختياري):",
-        placeholder="أدخل الآيات، الروايات، أقوال الفقهاء والأعلام، أو التفريعات المطلوبة...",
-        height=130
-    )
-
-    if st.button("كتابة وتأصيل البحث / المقال"):
+    st.header("كتابة وتحقيق الأبحاث الحوزوية والمقالات العلمية")
+    c1, c2 = st.columns(2)
+    with c1:
+        r_type = st.selectbox("المجال:", ["بحث فقهي / أصولي استدلالي", "بحث كلامي وعقائدي", "دراسة قرآنية وحديثية", "تحقيق تراثي ورجالي", "مقال فكري فلسفي", "بحث علمي أكاديمي محكم"])
+    with c2:
+        r_meth = st.selectbox("المنهجية:", ["استدلالي حوزوي رصين (أقوال، أدلة، مناقشة، المختار)", "تحقيقي أكاديمي موثق بالمصادر", "مقال تحليلي فكري"])
+    
+    topic = st.text_input("عنوان البحث أو القضية:")
+    r_notes = st.text_area("المحاور، الأدلة، أو النصوص المطلوبة (اختياري):", height=110)
+    
+    if st.button("كتابة وتأصيل البحث"):
         if topic.strip():
-            with st.spinner("جاري التحرير الاستدلالي والتأصيل العلمي..."):
+            with st.spinner("جاري التحقيق الاستدلالي..."):
                 try:
-                    prompt = f"""أنت باحث ومحقق حوزوي خبير بالعلوم العقلية والنقلية ومنهجيات الاستدلال والتحقيق التراثي والأكاديمي.
-المجال التخصصي: {research_type}
-المنهج المتبع: {methodology}
-موضوع البحث: {topic}
-المحاور والمدخلات الإضافية: {raw_points if raw_points else 'توليد الهيكلية الشاملة وتأصيل الأدلة استناداً للمصادر المعتمدة'}
-
-المطلوب صياغته بأعلى درجات الرصانة والدقة اللغوية والاصطلاحية:
-1. المقدمة: تحرير محل النزاع، بيان ثمرة البحث، وتحديد السؤال المحوري.
-2. الهيكلية الاستدلالية:
-   - عرض الأقوال والآراء بدقة ونسبة كل رأي لصاحبه أو للمدرسة الفكرية.
-   - استعراض الأدلة (الكتاب، السنة، العقل، الإجماع/السيرة) مع وجه الاستدلال وتفريع المسائل المذكورة.
-   - الإيرادات والمناقشات العلمية (إن قيل... قلنا / والملاحظ عليه...).
-3. النتيجة والتحقيق المختار بدقة وتجرد علمي.
-4. ثبت المصادر والمراجع التراثية أو الفكرية المقترحة لمزيد من التحقيق والتوثيق."""
-
-                    res = generate_with_retry(prompt)
+                    p = f"""أنت باحث ومحقق حوزوي وأكاديمي خبير.
+المجال: {r_type} | المنهج: {r_meth} | الموضوع: {topic}
+المحاور: {r_notes if r_notes else 'تأصيل علمي شامل'}
+المطلوب:
+1. تحرير محل النزاع وثمرة البحث.
+2. الهيكلية الاستدلالية بالأقوال، الأدلة، والمناقشات (إن قيل... قلنا).
+3. المختار والتحقيق النهائي مع ثبت المصادر والمراجع التراثية/الأكاديمية."""
+                    res = generate_with_retry(p)
                     st.markdown("### 📜 النص العلمي المحرر:")
                     st.markdown(res.text)
-                    
-                    st.session_state.history.append({"type": "بحث حوزوي/علمي", "time": pd.Timestamp.now().strftime("%H:%M:%S"), "preview": res.text})
-                    docx_file = create_docx_download(res.text, f"بحث: {topic}")
-                    st.download_button("📥 تحميل البحث بصيغة Word", docx_file, file_name=f"{topic[:25]}.docx")
+                    docx_res = create_docx_download(res.text, f"بحث: {topic}")
+                    st.download_button("📥 تحميل البحث (Word)", docx_res, file_name=f"{topic[:20]}.docx")
                 except Exception as err:
-                    st.error(f"حدث خطأ أثناء معالجة الطلب: {err}")
+                    st.error(f"خطأ: {err}")
         else:
-            st.warning("يرجى إدخال عنوان أو موضوع البحث.")
+            st.warning("يرجى إدخال الموضوع.")
 
 # --- التبويب 2: التحرير والإعلام الصحفي ---
 with tab2:
     st.header("صياغة الأخبار والبيانات الصحفية باحترافية")
-    col_type, col_tone = st.columns(2)
-    with col_type:
-        news_type = st.selectbox(
-            "نوع القالب الإعلامي:",
-            [
-                "خبر صحفي قياسي (أسلوب الهرم المقلوب)",
-                "منشور تفاعلي لمنصات التواصل الاجتماعي (Facebook & X)",
-                "بيان صحفي وتصريح رسمي",
-                "تقرير إخباري موسّع مع عناصر جذب",
-                "تغطية مؤتمر / فعالية / نشاط ميداني"
-            ]
-        )
-    with col_tone:
-        news_tone = st.selectbox(
-            "نبرة الخطاب الإعلامي:",
-            ["احترافي رصين وجذاب", "حماسي وملهم للجمهور العام", "رسمي ومؤسسي دقيق", "تفاعلي ومختصر للسوشيال ميديا"]
-        )
-
-    raw_event = st.text_area("بيانات الفعالية أو تفاصيل الحدث (النقاط الأساسية):", height=120)
-    col_quote, col_target = st.columns(2)
-    with col_quote:
-        official_quote = st.text_input("تصريح رسمي أو اقتباس خاص (اختياري):")
-    with col_target:
-        target_audience = st.text_input("الجمهور المستهدف (اختياري):")
-
+    c_t, c_n = st.columns(2)
+    with c_t:
+        n_type = st.selectbox("القالب الصحفي:", ["خبر صحفي (هرم مقلوب)", "منشور منصات التواصل الاجتماعي (Facebook / X)", "بيان صحفي رسمي", "تقرير إخباري موسع"])
+    with c_n:
+        n_tone = st.selectbox("نبرة الخطاب:", ["احترافي رصين وجذاب", "حماسي وملهم", "رسمي دقيق", "تفاعلي ومختصر"])
+    
+    n_facts = st.text_area("الوقائع والبيانات الأساسية للخبر:", height=110)
     if st.button("صياغة المادة الإعلامية"):
-        if raw_event.strip():
-            with st.spinner("جاري صياغة الخبر باحترافية صحفية..."):
+        if n_facts.strip():
+            with st.spinner("جاري التحرير الصحفي..."):
                 try:
-                    prompt = f"""أنت رئيس تحرير وصحفي محترف.
-القالب: {news_type}
-النبرة: {news_tone}
-الجمهور: {target_audience if target_audience else 'الجمهور العام'}
-الوقائع: {raw_event}
-تصريح مرفق: {official_quote if official_quote else 'لا يوجد'}
-
-المطلوب:
-1. 3 مقترحات لعناوين جذابة.
-2. متن الخبر وفق الهرم المقلوب وبصياغة صحفية رصينة.
-3. صياغة مخصصة لمنصات التواصل الاجتماعي مع الوسوم (Hashtags)."""
-                    
-                    res = generate_with_retry(prompt)
-                    st.markdown("### 📰 المادة الصحفية الجاهزة:")
+                    p = f"أنت رئيس تحرير محترف. القالب: {n_type} | النبرة: {n_tone}\nالوقائع: {n_facts}\nالمطلوب: 3 عناوين جذابة، متن خبر مهيكل، وصيغة مخصصة للسوشيال ميديا مع الوسوم المناسبة."
+                    res = generate_with_retry(p)
+                    st.markdown("### 📰 المادة الصحفية:")
                     st.markdown(res.text)
-                    
-                    st.session_state.history.append({"type": "خبر صحفي", "time": pd.Timestamp.now().strftime("%H:%M:%S"), "preview": res.text})
-                    docx_file = create_docx_download(res.text, "المادة الصحفية")
-                    st.download_button("📥 تحميل المادة الصحفية (Word)", docx_file, file_name="Press_Release.docx")
+                    docx_res = create_docx_download(res.text, "المادة الإعلامية")
+                    st.download_button("📥 تحميل المادة (Word)", docx_res, file_name="Press_Release.docx")
                 except Exception as err:
-                    st.error(f"حدث خطأ: {err}")
+                    st.error(f"خطأ: {err}")
         else:
-            st.warning("يرجى إدخال تفاصيل الحدث.")
+            st.warning("يرجى إدخال الوقائع.")
 
 # --- التبويب 3: فحص ومقارنة الوثائق ---
 with tab3:
-    st.header("فحص الوثائق والصور أو مقارنة مسودتين")
-    doc_mode = st.radio("نوع العملية:", ["تحليل وتدقيق وثيقة واحدة (أو صورة)", "مقارنة وثيقتين لكشف الفروق والتعارضات"], horizontal=True)
-    
-    if doc_mode == "تحليل وتدقيق وثيقة واحدة (أو صورة)":
-        uploaded_file = st.file_uploader("ارفع الوثيقة (PDF, Word, PNG, JPG):", type=["pdf", "docx", "png", "jpg", "jpeg"], key="doc1")
-        query = st.text_input("المطلوب استخراجه أو تدقيقه:", placeholder="مثال: التدقيق اللغوي، كشف الثغرات، التلخيص...")
-        
-        if st.button("بدء التحليل", key="btn1"):
-            if uploaded_file and query:
-                with st.spinner("جاري التحليل..."):
+    st.header("فحص وتحليل ومقارنة الوثائق والصور")
+    doc_mode = st.radio("نوع العملية:", ["تدقيق وثيقة واحدة أو صورة", "مقارنة وثيقتين لكشف التعارضات"], horizontal=True)
+    if doc_mode == "تدقيق وثيقة واحدة أو صورة":
+        up_file = st.file_uploader("ارفع وثيقة أو صورة:", type=["pdf", "docx", "png", "jpg", "jpeg"])
+        q_text = st.text_input("المطلوب استخراجه أو تدقيقه:")
+        if st.button("بدء التدقيق"):
+            if up_file and q_text:
+                with st.spinner("جاري الفحص..."):
                     try:
-                        if uploaded_file.type.startswith("image/"):
-                            img = Image.open(uploaded_file)
-                            contents = [img, f"النبرة: {persona}\nالمهمة: {query}\nحلل محتوى هذه الصورة بدقة."]
+                        if up_file.type.startswith("image/"):
+                            img = Image.open(up_file)
+                            cnt = [img, f"المهمة: {q_text}\nحلل هذه الصورة/الوثيقة بدقة."]
                         else:
-                            text_data = extract_text_from_file(uploaded_file)
-                            contents = [f"النبرة: {persona}\nمحتوى الوثيقة:\n{text_data[:10000]}\n\nالمهمة: {query}"]
-                        
-                        res = generate_with_retry(contents)
-                        st.markdown("### 📋 التقرير الصادر:")
+                            txt = extract_text_from_file(up_file)
+                            cnt = [f"النص:\n{txt[:10000]}\n\nالمهمة: {q_text}"]
+                        res = generate_with_retry(cnt)
+                        st.markdown("### 📋 التقرير:")
                         st.markdown(res.text)
-                        
-                        st.session_state.history.append({"type": "تحليل وثيقة", "time": pd.Timestamp.now().strftime("%H:%M:%S"), "preview": res.text})
-                        docx_file = create_docx_download(res.text, "تقرير فحص وثيقة")
-                        st.download_button("📥 تحميل التقرير (Word)", docx_file, file_name="Document_Analysis.docx")
+                        docx_res = create_docx_download(res.text, "تقرير تدقيق وثيقة")
+                        st.download_button("📥 تحميل التقرير (Word)", docx_res, file_name="Doc_Report.docx")
                     except Exception as err:
-                        st.error(f"حدث خطأ: {err}")
-            else:
-                st.warning("يرجى إرفاق الملف وتحديد المطلوب.")
+                        st.error(f"خطأ: {err}")
     else:
-        col_a, col_b = st.columns(2)
-        with col_a:
-            file_a = st.file_uploader("الوثيقة الأولى:", type=["pdf", "docx"], key="fa")
-        with col_b:
-            file_b = st.file_uploader("الوثيقة الثانية:", type=["pdf", "docx"], key="fb")
-        
-        if st.button("إجراء المقارنة"):
-            if file_a and file_b:
-                with st.spinner("جاري مقارنة الوثائق..."):
+        col1, col2 = st.columns(2)
+        with col1:
+            fa = st.file_uploader("الوثيقة الأولى:", type=["pdf", "docx"], key="fa")
+        with col2:
+            fb = st.file_uploader("الوثيقة الثانية:", type=["pdf", "docx"], key="fb")
+        if st.button("مقارنة الوثيقتين"):
+            if fa and fb:
+                with st.spinner("جاري استخراج المقارنة..."):
                     try:
-                        text_a = extract_text_from_file(file_a)
-                        text_b = extract_text_from_file(file_b)
-                        prompt = f"""النبرة: {persona}
-قارن بدقة بين النصين:
-[الوثيقة 1]: {text_a[:6000]}
-[الوثيقة 2]: {text_b[:6000]}
-المطلوب: جدول مقارنة بالفروق، التناقضات، والتوصيات النهائية."""
-                        res = generate_with_retry(prompt)
+                        ta = extract_text_from_file(fa)
+                        tb = extract_text_from_file(fb)
+                        p = f"قارن بين الوثيقتين بالتفصيل واستخرج جدول الفروق، التعارضات، والتوصيات:\n[1]:\n{ta[:5000]}\n\n[2]:\n{tb[:5000]}"
+                        res = generate_with_retry(p)
                         st.markdown("### 🔍 تقرير المقارنة:")
                         st.markdown(res.text)
-                        docx_file = create_docx_download(res.text, "تقرير مقارنة وثيقتين")
-                        st.download_button("📥 تحميل تقرير المقارنة (Word)", docx_file, file_name="Comparison_Report.docx")
+                        docx_res = create_docx_download(res.text, "تقرير المقارنة")
+                        st.download_button("📥 تحميل التقرير (Word)", docx_res, file_name="Comparison.docx")
                     except Exception as err:
-                        st.error(f"حدث خطأ: {err}")
+                        st.error(f"خطأ: {err}")
 
-# --- التبويب 4: التخطيط الاستراتيجي ---
+# --- التبويب 4: القيادة والتخطيط والتقويم ---
 with tab4:
-    st.header("بناء الخطط التنفيذية ومصفوفة KPIs")
-    goals = st.text_area("أدخل الأهداف والبيانات الأولية:", height=120)
-    col1, col2 = st.columns(2)
-    with col1:
-        timeframe = st.selectbox("المدى الزمني:", ["شهري", "فصلي (3 أشهر)", "نصف سنوي", "خطة سنوية (4 أرباع)"])
-    with col2:
-        budget = st.text_input("الميزانية التقديرية (اختياري):")
+    st.header("إدارة الأعمال، التخطيط الاستراتيجي، والتقييم والتقويم")
+    mgmt_mode = st.radio("نوع المهمة:", ["بناء خطة استراتيجية ومؤشرات أداء", "تقييم وتقويم الأداء وكشف الانحرافات", "حلول قيادية وإدارة أزمات/فرق عمل"], horizontal=True)
     
-    if st.button("توليد الخطة"):
-        if goals:
-            with st.spinner("جاري إعداد الخطة..."):
-                try:
-                    prompt = f"""النبرة: {persona}
-الأهداف: {goals}\nالمدى: {timeframe}\nالميزانية: {budget}
-المطلوب: خطة مراحل مجدولة، مصفوفة مسؤوليات (RACI)، وجدول مؤشرات أداء (KPIs)."""
-                    res = generate_with_retry(prompt)
-                    st.markdown("### 🗓️ الخطة التنفيذية:")
-                    st.markdown(res.text)
-                    docx_file = create_docx_download(res.text, "الخطة التنفيذية")
-                    st.download_button("📥 تحميل الخطة (Word)", docx_file, file_name="Strategic_Plan.docx")
-                except Exception as err:
-                    st.error(f"حدث خطأ: {err}")
-        else:
-            st.warning("يرجى إدخال الأهداف.")
+    if mgmt_mode == "بناء خطة استراتيجية ومؤشرات أداء":
+        g_text = st.text_area("الأهداف والموارد المتاحة:", height=110)
+        t_frame = st.selectbox("النطاق الزمني:", ["شهري", "فصلي (3 أشهر)", "سنوي"])
+        if st.button("توليد الخطة"):
+            if g_text:
+                with st.spinner("جاري بناء الخطة القيادية..."):
+                    try:
+                        p = f"الأهداف: {g_text} | المدى: {t_frame}\nالمطلوب: خطة مراحل تنفيذية، مصفوفة مسؤوليات (RACI)، وجدول مؤشرات أداء قيادية (SMART KPIs)."
+                        res = generate_with_retry(p)
+                        st.markdown(res.text)
+                        docx_res = create_docx_download(res.text, "الخطة الاستراتيجية")
+                        st.download_button("📥 تحميل الخطة (Word)", docx_res, file_name="Plan.docx")
+                    except Exception as err:
+                        st.error(f"خطأ: {err}")
+    elif mgmt_mode == "تقييم وتقويم الأداء وكشف الانحرافات":
+        plan_in = st.text_area("المخطط له / المستهدفات:")
+        act_in = st.text_area("المنجز الفعلي على أرض الواقع:")
+        if st.button("إجراء التقييم والتقويم"):
+            if plan_in and act_in:
+                with st.spinner("جاري التقييم..."):
+                    try:
+                        p = f"المخطط: {plan_in}\nالمنجز: {act_in}\nالمطلوب: تقييم تفصيلي، تحديد نسبة الإنجاز والقصور، وخطة تقويم وتصحيح عاجلة للمتعثرات."
+                        res = generate_with_retry(p)
+                        st.markdown(res.text)
+                        docx_res = create_docx_download(res.text, "تقرير التقييم والتقويم")
+                        st.download_button("📥 تحميل التقرير (Word)", docx_res, file_name="Evaluation.docx")
+                    except Exception as err:
+                        st.error(f"خطأ: {err}")
+    else:
+        crisis_in = st.text_area("التحدي الإداري، الأزمة، أو المشكلة القيادية:")
+        if st.button("تقديم الحل القيادي"):
+            if crisis_in:
+                with st.spinner("جاري صياغة التوجيه القيادي..."):
+                    try:
+                        p = f"أنت خبير قيادة وإدارة مؤسسية. المشكلة/التحدي: {crisis_in}\nالمطلوب: تشخيص جذور المشكلة، استراتيجية قيادية للتعامل معها، خطوات عملية لتوجيه فريق العمل واحتواء الأزمة."
+                        res = generate_with_retry(p)
+                        st.markdown(res.text)
+                    except Exception as err:
+                        st.error(f"خطأ: {err}")
 
-# --- التبويب 5: المتابعة والتقييم ---
+# --- التبويب 5: الاستشارات الحياتية والديكور ---
 with tab5:
-    st.header("مقارنة المخطط بالمنجز وحساب الفجوات")
-    planned = st.text_area("المخطط له مسبقاً:", height=90)
-    actual = st.text_area("المنجز الفعلي:", height=90)
+    st.header("🌿 المستشار التخصصي: الزراعة، الصحة العامة، العلاقات، والديكور")
+    consult_type = st.selectbox(
+        "مجال الاستشارة:",
+        [
+            "🏡 تصميم وديكورات المنازل والمساحات",
+            "🌱 استشارات زراعية ونباتات وأسمدة",
+            "🩺 إرشادات ونمط حياة صحي عام",
+            "🤝 علاقات اجتماعية وأسرية وبناء الذات"
+        ]
+    )
+    consult_input = st.text_area("تفاصيل السؤال أو المساحة أو الحالة المراد استشارتها:", height=120)
     
-    if st.button("إجراء التدقيق"):
-        if planned and actual:
-            with st.spinner("جاري التحليل والتدقيق..."):
+    if st.button("طلب الاستشارة"):
+        if consult_input.strip():
+            with st.spinner("المستشار التخصصي يحلل ويقدم الحلول..."):
                 try:
-                    prompt = f"""النبرة: {persona}
-المخطط: {planned}\nالمنجز: {actual}
-المطلوب: جدول مقارنة، نسب الإنجاز، وإجراءات تصحيحية للمتعثرات."""
-                    res = generate_with_retry(prompt)
-                    st.markdown("### 📊 تقرير المتابعة:")
+                    p = f"""أنت مستشار خبير في {consult_type}.
+تفاصيل الاستفسار:
+{consult_input}
+
+المطلوب:
+- تقديم نصيحة تفصيلية، دقيقة، وعملية قابلة للتطبيق فوراً.
+- إذا كان ديكور: حدد توزيع المساحة، تناسق الألوان، الإضاءة، واختيار المواد.
+- إذا كان زراعة: حدد نوع التربة، الري، التسميد، وحلول الآفات.
+- إذا كانت صحية: قدم إرشادات نمط الحياة والعافية العامة مع التنبيه بضرورة مراجعة الطبيب المختص للحالات السريرية.
+- إذا كانت اجتماعية: قدم حلولاً نفسية واجتماعية مبنية على الحكمة والاتزان."""
+                    res = generate_with_retry(p)
                     st.markdown(res.text)
-                    docx_file = create_docx_download(res.text, "تقرير المتابعة والتقييم")
-                    st.download_button("📥 تحميل التقرير (Word)", docx_file, file_name="Evaluation_Report.docx")
+                    docx_res = create_docx_download(res.text, f"استشارة - {consult_type}")
+                    st.download_button("📥 تحميل الاستشارة (Word)", docx_res, file_name="Consultation.docx")
                 except Exception as err:
-                    st.error(f"حدث خطأ: {err}")
+                    st.error(f"خطأ: {err}")
         else:
-            st.warning("يرجى تعبئة الحقلين معاً.")
+            st.warning("يرجى إدخال تفاصيل الاستشارة.")
 
 # --- التبويب 6: لوحة المؤشرات البيانية ---
 with tab6:
-    st.header("📊 لوحة قياس الأداء البيانية التفاعلية")
-    default_data = {
-        "المسار / النشاط": ["السكرتارية والمتابعة", "البحوث والتحقيق", "الإعلام والنشر", "التدقيق الإداري"],
-        "المستهدف (%)": [100, 100, 100, 100],
-        "المتحقق الفعلي (%)": [95, 90, 85, 92]
+    st.header("📊 لوحة قياس الأداء والمتابعة البيانية")
+    default_df = {
+        "المسار / المهمة": ["الشؤون الشخصية والمتابعة", "البحوث والتحقيق", "الإعلام والنشر", "التدقيق الإداري", "المشاريع الحياتية والتطوير"],
+        "المستهدف (%)": [100, 100, 100, 100, 100],
+        "المتحقق الفعلي (%)": [95, 90, 85, 92, 80]
     }
-    df = st.data_editor(pd.DataFrame(default_data), num_rows="dynamic")
-    
+    df = st.data_editor(pd.DataFrame(default_df), num_rows="dynamic")
     if not df.empty:
         df["الفجوة (%)"] = df["المستهدف (%)"] - df["المتحقق الفعلي (%)"]
         fig = px.bar(
             df, 
-            x="المسار / النشاط", 
+            x="المسار / المهمة", 
             y=["المتحقق الفعلي (%)", "الفجوة (%)"],
             title="مقارنة الإنجاز الفعلي مقابل الفجوة المتبقية",
             barmode="stack",
