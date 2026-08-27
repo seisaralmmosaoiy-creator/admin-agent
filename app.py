@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 from pypdf import PdfReader
 import docx
 
@@ -13,11 +13,12 @@ if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
     st.stop()
 
-# تهيئة العميل
+# تهيئة Gemini
 try:
-    client = genai.Client(api_key=api_key)
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
 except Exception as e:
-    st.error(f"خطأ في تهيئة العميل: {e}")
+    st.error(f"خطأ في تهيئة النموذج: {e}")
     st.stop()
 
 def extract_text_from_pdf(file):
@@ -54,10 +55,7 @@ with tab1:
 المهمة: {doc_query}
 قدّم تقريراً هيكلياً يتضمن ملخصاً تنفيذياً، الثغرات أو النواقص إن وجدت، والتوصيات التنفيذية."""
                     
-                    response = client.models.generate_content(
-                        model="gemini-1.5-flash",
-                        contents=prompt
-                    )
+                    response = model.generate_content(prompt)
                     st.markdown("### 📋 التقرير التحليلي:")
                     st.markdown(response.text)
                 except Exception as err:
@@ -82,10 +80,7 @@ with tab2:
 2. مصفوفة تحديد المسؤوليات والموارد المطلوبة.
 3. جدول مؤشرات قياس أداء واضحة وقابلة للقياس (KPIs SMART) مع القيم المستهدفة."""
                     
-                    response = client.models.generate_content(
-                        model="gemini-1.5-flash",
-                        contents=prompt
-                    )
+                    response = model.generate_content(prompt)
                     st.markdown("### 🗓️ الخطة التنفيذية المقترحة:")
                     st.markdown(response.text)
                 except Exception as err:
@@ -112,10 +107,7 @@ with tab3:
 2. تحديد نسبة الإنجاز التقريبية وتحديد مواطن الخلل أو التأخير.
 3. خطة إجراءات تصحيحية فورية وملموسة لمعالجة الفجوات."""
                     
-                    response = client.models.generate_content(
-                        model="gemini-1.5-flash",
-                        contents=prompt
-                    )
+                    response = model.generate_content(prompt)
                     st.markdown("### 📊 تقرير المتابعة والتقييم:")
                     st.markdown(response.text)
                 except Exception as err:
