@@ -1,5 +1,6 @@
 import os
 import io
+import time
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -8,8 +9,9 @@ from PIL import Image
 from pypdf import PdfReader
 import docx
 
-st.set_page_config(page_title="المنظومة الإدارية والعلمية الشاملة", layout="wide", page_icon="📚")
+st.set_page_config(page_title="المساعد التنفيذي والعلمي الشامل", layout="wide", page_icon="🏛️")
 
+# إعداد المفتاح
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
@@ -17,6 +19,18 @@ if not api_key:
 
 client = genai.Client(api_key=api_key.strip())
 MODEL_NAME = "gemini-3.6-flash"
+
+# دالة ذكية لإعادة المحاولة عند الضغط المؤقت على السيرفر (503)
+def generate_with_retry(contents, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return client.models.generate_content(model=MODEL_NAME, contents=contents)
+        except Exception as e:
+            if "503" in str(e) or "UNAVAILABLE" in str(e):
+                if attempt < max_retries - 1:
+                    time.sleep(3)
+                    continue
+            raise e
 
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -40,19 +54,21 @@ def create_docx_download(content_text, title="المستند"):
     doc.save(bio)
     return bio.getvalue()
 
+# الشريط الجانبي
 with st.sidebar:
-    st.header("⚙️ خيارات التخصيص العام")
+    st.header("⚙️ تخصيص الأسلوب العام")
     persona = st.selectbox(
-        "نبرة الصياغة الإدارية والعامة:",
+        "نبرة الصياغة الافتراضية:",
         [
+            "سكرتارية تنفيذية رفيعة المستوى ورسمية",
             "تدقيق رقابي وقانوني صارم",
             "صياغة إدارية واستراتيجية متوازنة",
             "صياغة إعلامية وبيانات صحفية",
-            "أسلوب تشغيلي وميداني مباشر"
+            "بحث حوزوي واستدلالي رصين"
         ]
     )
     st.markdown("---")
-    st.subheader("🗂️ سجل العمليات")
+    st.subheader("🗂️ سجل المخرجات الأخيرة")
     if st.session_state.history:
         for idx, item in enumerate(reversed(st.session_state.history)):
             with st.expander(f"{item['type']} - {item['time']}"):
@@ -60,9 +76,11 @@ with st.sidebar:
     else:
         st.caption("لا توجد مخرجات محفوظة بعد.")
 
-st.title("🏛️ المنظومة الإدارية والعلمية والإعلامية الشاملة")
+st.title("🏛️ المنظومة الإدارية والعلمية والمساعد التنفيذي الخاص")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+# التبويبات الشاملة
+tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "👤 السكرتير التنفيذي الخاص",
     "📚 البحوث الحوزوية والمقالات",
     "📰 التحرير والإعلام الصحفي",
     "📄 فحص ومقارنة الوثائق",
@@ -71,10 +89,64 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 لوحة المؤشرات البيانية"
 ])
 
+# --- التبويب 0: السكرتير التنفيذي الخاص ---
+with tab0:
+    st.header("👤 مهام السكرتارية التنفيذية وإدارة الأعمال")
+    
+    sec_task = st.selectbox(
+        "نوع المهمة الإدارية / السكرتارية:",
+        [
+            "صياغة كتاب رسمي / مخاطبة إدارية رفيعة المستوى",
+            "تحرير محضر اجتماع رسمي (Minutes of Meeting) وتحديد التكليفات",
+            "تنظيم جدول الأعمال وترتيب الأولويات اليومية / الأسبوعية",
+            "صياغة رسالة بريد إلكتروني (Email) رسمية أو عاجلة",
+            "تلخيص رسائل / تقارير مطولة وتقديم بطاقة إحاطة تنفيذية موجزة (Brief)"
+        ]
+    )
+    
+    col_from, col_to = st.columns(2)
+    with col_from:
+        sender_info = st.text_input("الجهة / الصفة الصادرة (اختياري):", placeholder="مثال: مكتب الإدارة العامة / رئيس القسم...")
+    with col_to:
+        receiver_info = st.text_input("الجهة / الصفة الموجه إليها (اختياري):", placeholder="مثال: معالي الوزير / مجلس الإدارة / موظفي القسم...")
+
+    sec_input = st.text_area(
+        "البيانات، النقاط الأساسية، أو مسودة الموضوع:",
+        placeholder="اكتب هنا تفاصيل الموضوع أو مسودة الاجتماع أو قائمة المهام المراد تنظيمها...",
+        height=140
+    )
+    
+    if st.button("تنفيذ المهمة عبر السكرتير التنفيذي", type="primary"):
+        if sec_input.strip():
+            with st.spinner("جاري الإعداد والصياغة التنفيذية المتقنة..."):
+                try:
+                    prompt = f"""أنت سكرتير تنفيذي ومساعد خاص رفيع المستوى (Executive Assistant)، تتميز بالدقة العالية، الفطنة الإدارية، الصياغة المحكمة الخالية من الحشو، واستخدام أرفع أساليب الدبلوماسية الإدارية.
+المهمة الموكلة إليك: {sec_task}
+الصفة الصادرة: {sender_info if sender_info else 'الإدارة المعنية'}
+الجهة الموجه إليها: {receiver_info if receiver_info else 'الجهة ذات العلاقة'}
+المدخلات والملاحظات الأولية:
+{sec_input}
+
+المطلوب:
+- إخراج المستند بتنسيق مؤسسي كامل وجاهز للاعتماد أو التوقيع فوراً.
+- استخدام الترويسة، الديباجة، المتن المهيكل، وخاتمة مناسبة بدقة.
+- استخراج جدول مهام أو خطوات إجرائية تالية (Action Items) إن كانت المهمة محضر اجتماع أو تنظيم أعمال."""
+                    
+                    res = generate_with_retry(prompt)
+                    st.markdown("### 📑 المستند الصادر من السكرتير التنفيذي:")
+                    st.markdown(res.text)
+                    
+                    st.session_state.history.append({"type": "مهمة سكرتارية", "time": pd.Timestamp.now().strftime("%H:%M:%S"), "preview": res.text})
+                    docx_file = create_docx_download(res.text, f"مستند سكرتارية - {sec_task}")
+                    st.download_button("📥 تحميل المستند بصيغة Word", docx_file, file_name="Executive_Document.docx")
+                except Exception as err:
+                    st.error(f"حدث خطأ أثناء المعالجة: {err}")
+        else:
+            st.warning("يرجى إدخال البيانات أو تفاصيل المهمة.")
+
 # --- التبويب 1: البحوث الحوزوية والمقالات ---
 with tab1:
     st.header("كتابة وتحقيق الأبحاث الحوزوية والمقالات الفكرية")
-    
     col_field, col_style = st.columns(2)
     with col_field:
         research_type = st.selectbox(
@@ -99,14 +171,14 @@ with tab1:
             ]
         )
 
-    topic = st.text_input("عنوان البحث أو القضية المراد معالجتها:", placeholder="مثال: قاعدة نفي السبيل وتطبيقاتها المعاصرة / حجية الخبر الموثوق...")
+    topic = st.text_input("عنوان البحث أو القضية المراد معالجتها:", placeholder="مثال: ملكية الميت / قاعدة نفي السبيل وتطبيقاتها المعاصرة...")
     raw_points = st.text_area(
         "المحاور، الأدلة المقترحة، أو النصوص المراد تضمينها (اختياري):",
-        placeholder="أدخل الآيات، الروايات، أقوال الأعلام (كالشيخ الأنصاري، المحقق الخوئي، السيد الصدر وغيرهم)، أو الفروع المراد إدراجها...",
+        placeholder="أدخل الآيات، الروايات، أقوال الفقهاء والأعلام، أو التفريعات المطلوبة...",
         height=130
     )
 
-    if st.button("كتابة وتأصيل البحث / المقال", type="primary"):
+    if st.button("كتابة وتأصيل البحث / المقال"):
         if topic.strip():
             with st.spinner("جاري التحرير الاستدلالي والتأصيل العلمي..."):
                 try:
@@ -117,15 +189,15 @@ with tab1:
 المحاور والمدخلات الإضافية: {raw_points if raw_points else 'توليد الهيكلية الشاملة وتأصيل الأدلة استناداً للمصادر المعتمدة'}
 
 المطلوب صياغته بأعلى درجات الرصانة والدقة اللغوية والاصطلاحية:
-1. المقدمة: تحرير محل النزاع، بيان أهمية البحث، وتحديد السؤال المحوري.
+1. المقدمة: تحرير محل النزاع، بيان ثمرة البحث، وتحديد السؤال المحوري.
 2. الهيكلية الاستدلالية:
    - عرض الأقوال والآراء بدقة ونسبة كل رأي لصاحبه أو للمدرسة الفكرية.
-   - استعراض الأدلة (الكتاب، السنة، العقل، الإجماع/السيرة) مع وجه الاستدلال.
+   - استعراض الأدلة (الكتاب، السنة، العقل، الإجماع/السيرة) مع وجه الاستدلال وتفريع المسائل المذكورة.
    - الإيرادات والمناقشات العلمية (إن قيل... قلنا / والملاحظ عليه...).
 3. النتيجة والتحقيق المختار بدقة وتجرد علمي.
-4. ثبت المصادر والمراجع التراثية أو الفكرية المقترحة لمزيد من التحقيق."""
+4. ثبت المصادر والمراجع التراثية أو الفكرية المقترحة لمزيد من التحقيق والتوثيق."""
 
-                    res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                    res = generate_with_retry(prompt)
                     st.markdown("### 📜 النص العلمي المحرر:")
                     st.markdown(res.text)
                     
@@ -181,7 +253,7 @@ with tab2:
 2. متن الخبر وفق الهرم المقلوب وبصياغة صحفية رصينة.
 3. صياغة مخصصة لمنصات التواصل الاجتماعي مع الوسوم (Hashtags)."""
                     
-                    res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                    res = generate_with_retry(prompt)
                     st.markdown("### 📰 المادة الصحفية الجاهزة:")
                     st.markdown(res.text)
                     
@@ -213,7 +285,7 @@ with tab3:
                             text_data = extract_text_from_file(uploaded_file)
                             contents = [f"النبرة: {persona}\nمحتوى الوثيقة:\n{text_data[:10000]}\n\nالمهمة: {query}"]
                         
-                        res = client.models.generate_content(model=MODEL_NAME, contents=contents)
+                        res = generate_with_retry(contents)
                         st.markdown("### 📋 التقرير الصادر:")
                         st.markdown(res.text)
                         
@@ -242,7 +314,7 @@ with tab3:
 [الوثيقة 1]: {text_a[:6000]}
 [الوثيقة 2]: {text_b[:6000]}
 المطلوب: جدول مقارنة بالفروق، التناقضات، والتوصيات النهائية."""
-                        res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                        res = generate_with_retry(prompt)
                         st.markdown("### 🔍 تقرير المقارنة:")
                         st.markdown(res.text)
                         docx_file = create_docx_download(res.text, "تقرير مقارنة وثيقتين")
@@ -267,7 +339,7 @@ with tab4:
                     prompt = f"""النبرة: {persona}
 الأهداف: {goals}\nالمدى: {timeframe}\nالميزانية: {budget}
 المطلوب: خطة مراحل مجدولة، مصفوفة مسؤوليات (RACI)، وجدول مؤشرات أداء (KPIs)."""
-                    res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                    res = generate_with_retry(prompt)
                     st.markdown("### 🗓️ الخطة التنفيذية:")
                     st.markdown(res.text)
                     docx_file = create_docx_download(res.text, "الخطة التنفيذية")
@@ -290,7 +362,7 @@ with tab5:
                     prompt = f"""النبرة: {persona}
 المخطط: {planned}\nالمنجز: {actual}
 المطلوب: جدول مقارنة، نسب الإنجاز، وإجراءات تصحيحية للمتعثرات."""
-                    res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                    res = generate_with_retry(prompt)
                     st.markdown("### 📊 تقرير المتابعة:")
                     st.markdown(res.text)
                     docx_file = create_docx_download(res.text, "تقرير المتابعة والتقييم")
@@ -304,9 +376,9 @@ with tab5:
 with tab6:
     st.header("📊 لوحة قياس الأداء البيانية التفاعلية")
     default_data = {
-        "المسار / النشاط": ["البحوث والتحقيق", "الإعلام والنشر", "التدقيق الإداري", "التطوير والتدريب"],
+        "المسار / النشاط": ["السكرتارية والمتابعة", "البحوث والتحقيق", "الإعلام والنشر", "التدقيق الإداري"],
         "المستهدف (%)": [100, 100, 100, 100],
-        "المتحقق الفعلي (%)": [90, 85, 95, 70]
+        "المتحقق الفعلي (%)": [95, 90, 85, 92]
     }
     df = st.data_editor(pd.DataFrame(default_data), num_rows="dynamic")
     
