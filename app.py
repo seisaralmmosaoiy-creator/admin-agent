@@ -1,6 +1,7 @@
 import os
 import io
 import time
+import re
 import sqlite3
 import datetime
 import streamlit as st
@@ -14,6 +15,16 @@ import docx
 from gtts import gTTS
 
 st.set_page_config(page_title="المنظومة الاستشارية والتنفيذية الشاملة", layout="wide", page_icon="🏛️")
+
+# --- دالة تنظيف التوقيتات الصوتية (Timestamps) ---
+def clean_text_output(text: str) -> str:
+    if not text:
+        return ""
+    # إزالة التوقيتات بصيغة الدقائق والثواني مثل 02:14 أو 01:57
+    cleaned = re.sub(r'\b\d{1,2}:\d{2}\b', '', text)
+    # تنظيف المسافات الزائدة
+    cleaned = re.sub(r' +', ' ', cleaned)
+    return cleaned.strip()
 
 # --- تهيئة قاعدة البيانات المحلية الدائمة (SQLite) ---
 DB_FILE = "archive.db"
@@ -142,7 +153,7 @@ with st.sidebar:
     )
     voice_output = st.checkbox("🔊 تشغيل الرد الصوتي تلقائياً", value=True)
     st.markdown("---")
-    st.caption("💾 جميع الطلبات والبحوث والمحادثات تؤرشف تلقائياً بشكل دائم.")
+    st.caption("💾 جميع الطلبات والبحوث والمحادثات تؤرشف تلقائياً بشكل دائم خالية من التوقيتات الصوتية.")
 
 st.title("🏛️ المنظومة الاستشارية والتنفيذية الشاملة")
 
@@ -170,7 +181,11 @@ with tab0:
             audio_raw = audio_record.read()
             contents_list = [
                 types.Part.from_bytes(data=audio_raw, mime_type="audio/wav"),
-                f"أنت سكرتيري ومساعدي الشخصي الخاص في كل شؤون حياتي. أسلوبك: {secretary_mode}. استمع لما قلته وأجبني بحكمة ولباقة وحلول وافية."
+                f"""أنت سكرتيري ومساعدي الشخصي الخاص في كل شؤون حياتي. أسلوبك: {secretary_mode}.
+استمع لما قلته في هذا التسجيل ونفذ المطلوب بدقة ولباقة وتنسيق متقن.
+تعليمات صارمة:
+- يُمنع منعاً باتاً كتابة أي توقيتات زمنية أو طوابع صوتية (مثل 01:23 أو 02:14) في النص.
+- اكتب المخرجات والكتب الرسمية بلغة عربية نظيفة ومترابطة وجاهزة للاعتماد المباشر."""
             ]
             user_prompt_txt = "🎤 [رسالة صوتية مسجلة]"
         elif text_input_val.strip():
@@ -179,14 +194,14 @@ with tab0:
                 f"""أنت سكرتيري ومساعدي الشخصي الشامل في كل شؤون حياتي وأفكاري وأعمالي.
 الأسلوب: {secretary_mode}
 الرسالة: {text_input_val}
-أجبني بدقة، رتب الأولويات، وقدم المخرجات المطلوبة بأعلى جودة."""
+أجبني بدقة، رتب الأولويات، وقدم المخرجات المطلوبة بأعلى جودة وخالية من أي توقيتات."""
             ]
         
         if contents_list:
-            with st.spinner("السكرتير يجيب..."):
+            with st.spinner("السكرتير يجيب وينسق المستند..."):
                 try:
                     res = generate_with_retry(contents_list)
-                    reply = res.text
+                    reply = clean_text_output(res.text)
                     
                     save_record("محادثة شخصية", user_prompt_txt[:30], user_prompt_txt, reply)
                     
@@ -227,7 +242,7 @@ with tab1:
 2. الهيكلية الاستدلالية بالأقوال، الأدلة، والمناقشات (إن قيل... قلنا).
 3. المختار والتحقيق النهائي مع ثبت المصادر والمراجع التراثية/الأكاديمية."""
                     res = generate_with_retry(p)
-                    reply = res.text
+                    reply = clean_text_output(res.text)
                     
                     save_record("بحث حوزوي/علمي", topic, r_notes, reply)
                     
@@ -256,7 +271,7 @@ with tab2:
                 try:
                     p = f"أنت رئيس تحرير محترف. القالب: {n_type} | النبرة: {n_tone}\nالوقائع: {n_facts}\nالمطلوب: 3 عناوين جذابة، متن خبر مهيكل، وصيغة مخصصة للسوشيال ميديا مع الوسوم المناسبة."
                     res = generate_with_retry(p)
-                    reply = res.text
+                    reply = clean_text_output(res.text)
                     
                     save_record("إعلام وصحافة", n_facts[:30], n_facts, reply)
                     
@@ -287,7 +302,7 @@ with tab3:
                             txt = extract_text_from_file(up_file)
                             cnt = [f"النص:\n{txt[:10000]}\n\nالمهمة: {q_text}"]
                         res = generate_with_retry(cnt)
-                        reply = res.text
+                        reply = clean_text_output(res.text)
                         
                         save_record("فحص وثائق", up_file.name, q_text, reply)
                         
@@ -311,7 +326,7 @@ with tab3:
                         tb = extract_text_from_file(fb)
                         p = f"قارن بين الوثيقتين بالتفصيل واستخرج جدول الفروق، التعارضات، والتوصيات:\n[1]:\n{ta[:5000]}\n\n[2]:\n{tb[:5000]}"
                         res = generate_with_retry(p)
-                        reply = res.text
+                        reply = clean_text_output(res.text)
                         
                         save_record("مقارنة وثائق", f"{fa.name} VS {fb.name}", "مقارنة نسختين", reply)
                         
@@ -336,7 +351,7 @@ with tab4:
                     try:
                         p = f"الأهداف: {g_text} | المدى: {t_frame}\nالمطلوب: خطة مراحل تنفيذية، مصفوفة مسؤوليات (RACI)، وجدول مؤشرات أداء قيادية (SMART KPIs)."
                         res = generate_with_retry(p)
-                        reply = res.text
+                        reply = clean_text_output(res.text)
                         save_record("خطة استراتيجية", g_text[:30], f"نطاق: {t_frame}", reply)
                         st.markdown(reply)
                         docx_res = create_docx_download(reply, "الخطة الاستراتيجية")
@@ -352,7 +367,7 @@ with tab4:
                     try:
                         p = f"المخطط: {plan_in}\nالمنجز: {act_in}\nالمطلوب: تقييم تفصيلي، نسبة الإنجاز، وخطة تصحيح عاجلة."
                         res = generate_with_retry(p)
-                        reply = res.text
+                        reply = clean_text_output(res.text)
                         save_record("تقييم وتقويم", "مقارنة منجز", f"مخطط: {plan_in[:30]}", reply)
                         st.markdown(reply)
                         docx_res = create_docx_download(reply, "تقرير التقييم والتقويم")
@@ -367,7 +382,7 @@ with tab4:
                     try:
                         p = f"المشكلة/التحدي: {crisis_in}\nالمطلوب: تشخيص الجذور، استراتيجية قيادية، وخطوات عملية لتوجيه الفريق."
                         res = generate_with_retry(p)
-                        reply = res.text
+                        reply = clean_text_output(res.text)
                         save_record("حلول قيادية", crisis_in[:30], crisis_in, reply)
                         st.markdown(reply)
                     except Exception as err:
@@ -393,7 +408,7 @@ with tab5:
                 try:
                     p = f"أنت خبير في {consult_type}.\nالسؤال: {consult_input}\nالمطلوب: نصيحة دقيقة وعملية قابلة للتطبيق."
                     res = generate_with_retry(p)
-                    reply = res.text
+                    reply = clean_text_output(res.text)
                     save_record(f"استشارة: {consult_type}", consult_input[:30], consult_input, reply)
                     st.markdown(reply)
                     docx_res = create_docx_download(reply, f"استشارة - {consult_type}")
