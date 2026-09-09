@@ -107,9 +107,11 @@ if not api_key:
 client = genai.Client(api_key=api_key.strip())
 
 # النماذج الرسمية المستقرة ذات الاستجابة الفورية
+MODELS = # النماذج الرسمية النشطة والمعتمدة حالياً من Google
 MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro"
+    "gemini-3.7-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-pro-preview"
 ]
 
 def generate_with_retry(contents):
