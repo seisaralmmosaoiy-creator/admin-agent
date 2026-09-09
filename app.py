@@ -16,7 +16,7 @@ from gtts import gTTS
 
 st.set_page_config(page_title="المنظومة الاستشارية والتنفيذية الشاملة", layout="wide", page_icon="🏛️")
 
-# --- دالة تنظيف التوقيتات الصوتية (Timestamps) ---
+# --- دالة تنظيف التوقيتات الصوتية ---
 def clean_text_output(text: str) -> str:
     if not text:
         return ""
@@ -85,28 +85,37 @@ def delete_record(record_id):
 
 init_db()
 
-# --- إعداد اتصال الذكاء الاصطناعي مع التبديل التلقائي عند الحصة 429 ---
+# --- إعداد اتصال الذكاء الاصطناعي مع نماذج ذات سعة عالية ومجانية ---
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
     st.stop()
 
 client = genai.Client(api_key=api_key.strip())
-MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+
+# قائمة النماذج الفعالة التي توفر حصصاً كبيرة مجانية وتتولى العمل بالترتيب
+MODELS = [
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-3.6-flash"
+]
 
 def generate_with_retry(contents, max_retries=2):
+    last_err = None
     for model_name in MODELS:
         for attempt in range(max_retries):
             try:
                 return client.models.generate_content(model=model_name, contents=contents)
             except Exception as e:
+                last_err = e
                 err_str = str(e)
+                # إذا كان الخطأ ضغطاً أو تجاوز حصة لحظية انتظر ثوانٍ وجرب ثانية
                 if any(x in err_str for x in ["429", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE"]):
-                    if attempt < max_retries - 1:
-                        time.sleep(4)
-                        continue
+                    time.sleep(3)
+                    continue
+                # إن كان خطأ آخر في النموذج انتقل للنموذج التالي مباشرة
                 break
-    raise Exception("خوادم الذكاء الاصطناعي تشهد ضغطاً مؤقتاً، يرجى الانتظار 30 ثانية والمحاولة مجدداً.")
+    raise Exception(f"تعذر الاتصال بجميع النماذج البديلة: {last_err}")
 
 def text_to_audio_bytes(text_arabic):
     try:
@@ -139,10 +148,8 @@ def create_docx_download(content_text, title="المستند"):
     return bio.getvalue()
 
 def prepare_multimodal_payload(system_instruction, user_text, uploaded_file):
-    """دالة شاملة لتجهيز النصوص والملفات والصور معاً لأي قسم"""
     payload = []
     file_info = ""
-    
     if uploaded_file is not None:
         if uploaded_file.type.startswith("image/"):
             img = Image.open(uploaded_file)
@@ -172,7 +179,7 @@ with st.sidebar:
     )
     voice_output = st.checkbox("🔊 نطق الردود صوتياً", value=True)
     st.markdown("---")
-    st.caption("✅ جميع الأقسام تدعم رفع الملفات (PDF / Word) والصور والنصوص وتحفظ في الأرشيف الدائم.")
+    st.caption("✅ نظام التبديل التلقائي الاحتياطي مفعل لتفادي انقطاع الخدمة.")
 
 st.title("🏛️ المنظومة الاستشارية والتنفيذية الشاملة")
 
@@ -187,9 +194,7 @@ tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab_arch = st.tabs([
     "🗄️ الأرشيف الدائم والبحث"
 ])
 
-# ==========================================
 # 0. السكرتير الصوتي والشخصي
-# ==========================================
 with tab0:
     st.header("السكرتير الشخصي المباشر (صوت، ملفات، وصور)")
     audio_record = st.audio_input("🎙️ تسجيل صوتي مباشر:")
@@ -202,8 +207,7 @@ with tab0:
                 try:
                     sys_inst = f"""أنت سكرتيري ومساعدي التنفيذي الخاص والشامل. أسلوبك: {secretary_mode}.
 مهمتك إنجاز المطلوب بدقة إدارية ولغوية رفيعة.
-تنبيه حازم: يُمنع منعاً باتاً كتابة أي توقيتات زمنية صوتية (مثل 01:23) في النص نهائياً."""
-                    
+تنبيه حازم: يُمنع منعاً باتاً كتابة أي توقيتات زمنية صوتية في النص نهائياً."""
                     contents = []
                     if audio_record:
                         audio_raw = audio_record.read()
@@ -231,9 +235,7 @@ with tab0:
         else:
             st.warning("يرجى إدخال صوت، كتابة نص، أو رفع ملف.")
 
-# ==========================================
 # 1. البحوث الحوزوية والعلمية
-# ==========================================
 with tab1:
     st.header("كتابة وتحقيق الأبحاث الحوزوية والمقالات العلمية")
     c1, c2 = st.columns(2)
@@ -267,9 +269,7 @@ with tab1:
         else:
             st.warning("يرجى كتابة الموضوع أو إرفاق ملف.")
 
-# ==========================================
 # 2. التحرير والإعلام الصحفي
-# ==========================================
 with tab2:
     st.header("صياغة الأخبار والبيانات الصحفية باحترافية")
     c_t, c_n = st.columns(2)
@@ -301,9 +301,7 @@ with tab2:
         else:
             st.warning("يرجى إدخال تفاصيل الحدث أو رفع ملف.")
 
-# ==========================================
 # 3. فحص ومقارنة الوثائق
-# ==========================================
 with tab3:
     st.header("فحص وتحليل ومقارنة الوثائق والصور")
     doc_mode = st.radio("نوع العملية:", ["تدقيق وثيقة واحدة أو صورة", "مقارنة وثيقتين لكشف الفروقات والتعارضات"], horizontal=True)
@@ -353,9 +351,7 @@ with tab3:
                     except Exception as err:
                         st.error(f"خطأ: {err}")
 
-# ==========================================
 # 4. القيادة والتخطيط والتقويم
-# ==========================================
 with tab4:
     st.header("إدارة الأعمال، التخطيط الاستراتيجي، والتقييم والتقويم")
     mgmt_mode = st.radio("المهمة:", ["بناء خطة استراتيجية ومؤشرات أداء", "تقييم وتقويم الأداء ومعالجة الانحرافات", "حلول وتوجيه قيادي"], horizontal=True)
@@ -384,9 +380,7 @@ with tab4:
         else:
             st.warning("يرجى كتابة البيانات أو رفع ملف.")
 
-# ==========================================
 # 5. الاستشارات الحياتية والديكور
-# ==========================================
 with tab5:
     st.header("🌿 المستشار التخصصي: ديكور المنازل، الزراعة، الصحة، والعلاقات")
     consult_type = st.selectbox(
@@ -425,9 +419,7 @@ with tab5:
         else:
             st.warning("يرجى كتابة السؤال أو إرفاق صورة/ملف.")
 
-# ==========================================
 # 6. اللوحة البيانية
-# ==========================================
 with tab6:
     st.header("📊 لوحة قياس الأداء والمتابعة البيانية")
     default_df = {
@@ -448,9 +440,7 @@ with tab6:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-# ==========================================
 # 7. الأرشيف الدائم والبحث (SQLite)
-# ==========================================
 with tab_arch:
     st.header("🗄️ الأرشيف الدائم وقاعدة البيانات")
     st.write("استعرض، ابحث، أو أعد تحميل أي بحث، مستند، أو محادثة تم حفظها في النظام.")
