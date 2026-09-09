@@ -15,7 +15,7 @@ import docx
 
 st.set_page_config(page_title="الوكيل الاستشاري والتنفيذي الذكي", layout="wide", page_icon="⚡")
 
-# --- تنظيف النصوص من الطوابع الزمنية الصوتية ---
+# --- تنظيف النصوص من أي طوابع زمنية صوتية ---
 def clean_text_output(text: str) -> str:
     if not text:
         return ""
@@ -23,7 +23,7 @@ def clean_text_output(text: str) -> str:
     cleaned = re.sub(r' +', ' ', cleaned)
     return cleaned.strip()
 
-# --- قاعدة البيانات المحلية المترابطة (SQLite) ---
+# --- قاعدة البيانات المحلية الدائمة (SQLite) ---
 DB_FILE = "archive.db"
 
 def init_db():
@@ -73,7 +73,7 @@ def get_records(search_query="", category_filter="الكل"):
     return rows
 
 def get_recent_context():
-    """استرجاع آخر 3 عمليات لربط القضايا والقرارات السابقة بذكاء"""
+    """استرجاع آخر العمليات لربط السياق والقرارات بذكاء"""
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
@@ -82,7 +82,7 @@ def get_recent_context():
         conn.close()
         if not rows:
             return ""
-        ctx = "\n[السياق والقرارات الأخيرة المحفوظة لديك]:\n"
+        ctx = "\n[السياق والقرارات الأخيرة السابقة المحفوظة لديك]:\n"
         for r in rows:
             ctx += f"- {r[0]} ({r[1]}): {r[2][:300]}...\n"
         return ctx
@@ -98,7 +98,7 @@ def delete_record(record_id):
 
 init_db()
 
-# --- إعداد المحرك الذكي السريع والمستقر ---
+# --- إعداد اتصال الذكاء الاصطناعي بالنماذج الرسمية الحديثة ---
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ يرجى ضبط مفتاح GEMINI_API_KEY في إعدادات Secrets.")
@@ -106,8 +106,7 @@ if not api_key:
 
 client = genai.Client(api_key=api_key.strip())
 
-# النماذج الرسمية المستقرة ذات الاستجابة الفورية
-MODELS = # النماذج الرسمية النشطة والمعتمدة حالياً من Google
+# النماذج الرسمية النشطة بالترتيب لضمان أسرع استجابة وأعلى سعة
 MODELS = [
     "gemini-3.7-flash",
     "gemini-3.5-flash-lite",
@@ -126,6 +125,10 @@ def generate_with_retry(contents):
             except Exception as e:
                 last_err = e
                 err_str = str(e)
+                # إذا كان النموذج غير مدعوم انتقل للذي بعده مباشرة
+                if "404" in err_str or "NOT_FOUND" in err_str:
+                    break
+                # في حالات الضغط المؤقت
                 if any(x in err_str for x in ["503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED"]):
                     time.sleep(2)
                     continue
@@ -158,7 +161,7 @@ def prepare_multimodal_payload(system_instruction, user_text, uploaded_file):
         if uploaded_file.type.startswith("image/"):
             img = Image.open(uploaded_file)
             payload.append(img)
-            file_info = f"\n[مرفق صورة مفحوصة: {uploaded_file.name}]"
+            file_info = f"\n[مرفق صورة: {uploaded_file.name}]"
         else:
             extracted = extract_text_from_file(uploaded_file)
             file_info = f"\n[محتوى المستند ({uploaded_file.name})]:\n{extracted[:10000]}\n"
@@ -181,7 +184,7 @@ with st.sidebar:
         ]
     )
     st.markdown("---")
-    st.caption("🧠 الربط التلقائي بالذاكرة والأرشيف مفعّل.")
+    st.caption("🧠 نظام الذاكرة الفورية والنماذج السريعة مفعّل.")
 
 st.title("🏛️ المنظومة التنفيذية والاستشارية المتكاملة")
 
@@ -210,9 +213,9 @@ with tab0:
                     sys_inst = f"""أنت السكرتير والمساعد التنفيذي الخاص الأعلى كفاءة وفطنة. أسلوبك: {persona_mode}.
 مهمتك:
 1. فهم جوهر التوجيه فوراً وتحديد القالب بدقة (كتاب رسمي، محضر اجتماع، مذكرة داخلية، قرار إداري، أو تحليل شخصي).
-2. إذا كان المطلوب محضر اجتماع أو قراراً: نظمه بأسلوب مؤسسي رصين (الديباجة، الحضور، المداولات، القرارات بالإجماع أو الأغلبية، التكليفات والتوقيعات).
-3. اربط الوقائع الحالية بالقرارات السابقة المذكورة في السياق إن وجدت.
-4. يمنع منعاً باتاً وضع أي طوابع زمنية صوتية في النص."""
+2. التزم تماماً برغبة المدير: إذا طلب كتاباً رسمياً صغ كتاباً رسمياً متكاملاً، وإذا طلب محضراً صغ محضراً.
+3. التنسيق المؤسسي الرصين: الديباجة، الرقم، التاريخ، متن القرار أو التوجيه، التوقيعات والجهات المبلغة.
+4. يمنع منعاً باتاً وضع أي طوابع زمنية صوتية داخل النص."""
                     
                     contents = []
                     if audio_record:
